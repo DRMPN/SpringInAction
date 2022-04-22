@@ -19,6 +19,10 @@
             </li>
         </ul>
 
+        <form method="POST" th:action="@{/logout}">
+            <input type="submit" value="Logout" />
+        </form>
+
         <div th:if="${#fields.hasErrors()}">
             <span class="validationError">
                 Please correct the problems below and resubmit.

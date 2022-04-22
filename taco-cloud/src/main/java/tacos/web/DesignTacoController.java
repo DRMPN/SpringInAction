@@ -1,5 +1,8 @@
 package tacos.web;
 
+import java.security.Principal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -19,8 +22,11 @@ import lombok.extern.slf4j.Slf4j;
 import tacos.Ingredient;
 import tacos.Taco;
 import tacos.TacoOrder;
+import tacos.User;
 import tacos.Ingredient.Type;
 import tacos.data.IngredientRepository;
+import tacos.data.TacoRepository;
+import tacos.data.UserRepository;
 
 @Slf4j
 @Controller
@@ -30,14 +36,24 @@ public class DesignTacoController {
 
     private final IngredientRepository ingredientRepo;
 
+    private TacoRepository tacoRepo;
+
+    private UserRepository userRepo;
+
     @Autowired
-    public DesignTacoController(IngredientRepository ingredientRepo) {
+    public DesignTacoController(IngredientRepository ingredientRepo,
+                                TacoRepository tacoRepo,
+                                UserRepository userRepo) {
         this.ingredientRepo = ingredientRepo;
+        this.tacoRepo = tacoRepo;
+        this.userRepo = userRepo;
     }
 
     @ModelAttribute
     public void addIngredientsToModel(Model model) {
-        Iterable<Ingredient> ingredients = ingredientRepo.findAll();
+        List<Ingredient> ingredients = new ArrayList<>();
+        ingredientRepo.findAll().forEach(i -> ingredients.add(i));;
+
         Type[] types = Ingredient.Type.values();
         for (Type type : types) {
             model.addAttribute(type.toString().toLowerCase(),
@@ -45,7 +61,7 @@ public class DesignTacoController {
         }
     }
 
-    @ModelAttribute(name = "tacoOrder")
+    @ModelAttribute(name = "order")
     public TacoOrder order() {
         return new TacoOrder();
     }
@@ -53,6 +69,13 @@ public class DesignTacoController {
     @ModelAttribute(name = "taco")
     public Taco taco() {
         return new Taco();
+    }
+    
+    @ModelAttribute
+    public User user(Principal principal) {
+        String username = principal.getName();
+        User user = userRepo.findByUsername(username);
+        return user;
     }
 
     @GetMapping
@@ -63,21 +86,24 @@ public class DesignTacoController {
     @PostMapping
     public String processTaco(
             @Valid Taco taco, Errors errors,
-            @ModelAttribute TacoOrder tacoOrder) {
+            @ModelAttribute TacoOrder order) {
+
+        log.info("   --- Saving taco");
 
         if (errors.hasErrors()) {
             return "design";
         }
 
-        tacoOrder.addTaco(taco);
-        log.info("Processing taco: {}", taco);
+        Taco saved = tacoRepo.save(taco);
+        order.addTaco(saved);
 
         return "redirect:/orders/current";
     }
 
-    private Iterable<Ingredient> filterByType(
-            Iterable<Ingredient> ingredients, Type type) {
-        return StreamSupport.stream(ingredients.spliterator(), false)
+    private List<Ingredient> filterByType(
+            List<Ingredient> ingredients, Type type) {
+        return ingredients
+                .stream()
                 .filter(x -> x.getType().equals(type))
                 .collect(Collectors.toList());
     }
